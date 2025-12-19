@@ -53,7 +53,7 @@ function Get-AllDocuments {
     param(
         [string]$SiteUrl,
         [string]$Token,
-        [string]$ListType = "Active"  # Active or Archived
+        [string]$ListType = "Active"
     )
 
     $uri = [System.Uri]$SiteUrl
@@ -86,7 +86,6 @@ function Get-AllDocuments {
 
             $page++
 
-            # Check if we've retrieved all documents
             if ($allDocuments.Count -ge $response.totalItemCount) {
                 break
             }
@@ -161,7 +160,6 @@ function Get-DocumentHistory {
 function Get-LastUploadDate {
     param($History)
 
-    # Type 1 = Upload
     $uploads = $History | Where-Object { $_.type -eq 1 } | Sort-Object date -Descending
     if ($uploads -and $uploads.Count -gt 0) {
         return $uploads[0].date
@@ -173,7 +171,6 @@ function Get-LastUploadDate {
 function Get-LastApprovedBy {
     param($History)
 
-    # Type 4 = Approved
     $approvals = $History | Where-Object { $_.type -eq 4 } | Sort-Object date -Descending
     if ($approvals -and $approvals.Count -gt 0) {
         return $approvals[0].userName
@@ -185,7 +182,6 @@ function Get-LastApprovedBy {
 function Get-ArchivedDate {
     param($History)
 
-    # For archived documents, get the most recent history entry date
     if ($History -and $History.Count -gt 0) {
         $sorted = $History | Sort-Object date -Descending
         return $sorted[0].date
@@ -204,27 +200,25 @@ function Format-Stakeholders {
     return ""
 }
 
-# Main script
-Write-Host "`n=== Nintex Process Manager Document Report Generator ===" -ForegroundColor Cyan
+# Main script starts here
+Write-Host ""
+Write-Host "=== Nintex Process Manager Document Report Generator ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Prompt for Site URL
 $siteUrl = Read-Host "Enter your Process Manager Site URL (e.g., https://demo.promapp.com/93555a16ceb24f139a6e8a40618d3f8b)"
 
-# Validate Site URL
 if ([string]::IsNullOrWhiteSpace($siteUrl)) {
     Write-Error "Site URL is required"
     exit 1
 }
 
-# Ensure URL doesn't end with a slash
 $siteUrl = $siteUrl.TrimEnd('/')
 
 # Prompt for credentials
 $username = Read-Host "Enter your username"
 $securePassword = Read-Host "Enter your password" -AsSecureString
-$password = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
+$password = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
 
 # Get authentication token
 try {
@@ -235,39 +229,36 @@ catch {
     exit 1
 }
 
-# Get all documents (both active and archived)
-Write-Host "`nRetrieving documents..." -ForegroundColor Cyan
+# Get all documents
+Write-Host ""
+Write-Host "Retrieving documents..." -ForegroundColor Cyan
 $activeDocuments = Get-AllDocuments -SiteUrl $siteUrl -Token $token -ListType "Active"
 $archivedDocuments = Get-AllDocuments -SiteUrl $siteUrl -Token $token -ListType "Archived"
 
 $allDocuments = $activeDocuments + $archivedDocuments
-Write-Host "`nTotal documents to process: $($allDocuments.Count)" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Total documents to process: $($allDocuments.Count)" -ForegroundColor Yellow
 
-# Process each document and build report data
+# Process each document
 $reportData = @()
 $counter = 0
 
 foreach ($doc in $allDocuments) {
     $counter++
-    Write-Host "`nProcessing document $counter of $($allDocuments.Count): $($doc.documentName)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Processing document $counter of $($allDocuments.Count): $($doc.documentName)" -ForegroundColor Cyan
 
-    # Get document properties
     $properties = Get-DocumentProperties -SiteUrl $siteUrl -Token $token -DocumentId $doc.documentId
-
-    # Get document history
     $history = Get-DocumentHistory -SiteUrl $siteUrl -Token $token -DocumentId $doc.documentId
 
-    # Extract data
     $lastUploadDate = Get-LastUploadDate -History $history
     $lastApprovedBy = Get-LastApprovedBy -History $history
 
-    # For archived documents, get the archived date
     $archivedDate = $null
     if ($doc.isArchived) {
         $archivedDate = $doc.archivedDate
     }
 
-    # Extract owners and approvers
     $owners = ""
     $approvers = ""
     if ($properties -and $properties.stakeholdersGroupedByType) {
@@ -275,7 +266,6 @@ foreach ($doc in $allDocuments) {
         $approvers = Format-Stakeholders -StakeholdersGrouped $properties.stakeholdersGroupedByType -Type "Approver"
     }
 
-    # Extract review dates
     $lastReviewDate = $null
     $nextReviewDate = $null
     if ($properties -and $properties.documentReview) {
@@ -283,7 +273,6 @@ foreach ($doc in $allDocuments) {
         $nextReviewDate = $properties.documentReview.nextReviewDueDate
     }
 
-    # Create report row
     $row = [PSCustomObject]@{
         'Document Name' = $doc.documentName
         'Document Primary Group Name' = $doc.primaryGroupName
@@ -299,19 +288,19 @@ foreach ($doc in $allDocuments) {
     }
 
     $reportData += $row
-
     Write-Host "  [OK] Processed successfully" -ForegroundColor Green
 }
 
-# Generate output filename with timestamp
+# Export to CSV
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $outputFile = "DocumentReport_$timestamp.csv"
 
-# Export to CSV
-Write-Host "`nGenerating CSV report..." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Generating CSV report..." -ForegroundColor Cyan
 $reportData | Export-Csv -Path $outputFile -NoTypeInformation -Encoding UTF8
 
-Write-Host "`n=== Report Generation Complete ===" -ForegroundColor Green
+Write-Host ""
+Write-Host "=== Report Generation Complete ===" -ForegroundColor Green
 Write-Host "Report saved to: $outputFile" -ForegroundColor Yellow
 Write-Host "Total documents processed: $($reportData.Count)" -ForegroundColor Yellow
 Write-Host ""
