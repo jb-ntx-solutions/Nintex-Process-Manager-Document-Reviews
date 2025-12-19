@@ -300,7 +300,7 @@ foreach ($doc in $allDocuments) {
 
     $reportData += $row
 
-    Write-Host "  ✓ Processed successfully" -ForegroundColor Green
+    Write-Host "  [OK] Processed successfully" -ForegroundColor Green
 }
 
 # Generate output filename with timestamp
