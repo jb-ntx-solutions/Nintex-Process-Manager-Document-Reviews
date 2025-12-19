@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generates a CSV report of all documents in a Nintex Process Manager site.
 
